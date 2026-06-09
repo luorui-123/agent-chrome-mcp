@@ -20,7 +20,7 @@ mkdir -p "$PROFILE"
 # 端口占用检查（区分「自己之前启的 Chrome」和「别的程序」）
 if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   HOLDER="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $1" (PID "$2")"}')"
-  if curl -s "http://127.0.0.1:$PORT/json/version" | grep -q "Browser"; then
+  if curl -s --noproxy '*' --max-time 5 "http://127.0.0.1:$PORT/json/version" | grep -q "Browser"; then
     echo "✅ 端口 $PORT 上已有一个调试版 Chrome 在运行（$HOLDER），直接复用即可，无需重启。"
     echo "   如需换端口：CHROME_MCP_PORT=9333 $0"
     exit 0
@@ -34,11 +34,32 @@ fi
 echo "🚀 启动调试版 Chrome"
 echo "   CDP 端口 : $PORT"
 echo "   持久 profile: $PROFILE"
-echo "   ➜ 在弹出的窗口里登录你要自动化的网站，登录态会长期保存在这个 profile。"
-echo "   ➜ 保持此窗口开着；Codex 里的 chrome MCP 会通过 CDP 连到它。"
-exec "$CHROME" \
-  --remote-debugging-port="$PORT" \
-  --user-data-dir="$PROFILE" \
-  --no-first-run \
-  --no-default-browser-check \
-  "about:blank"
+
+# 脱离终端/会话独立启动（关终端、agent 会话结束都不会连坐杀掉 Chrome），立即返回。
+if [ -n "${CHROME_BIN:-}" ]; then
+  # 自定义 Chrome 路径：nohup 后台启动
+  nohup "$CHROME" \
+    --remote-debugging-port="$PORT" \
+    --user-data-dir="$PROFILE" \
+    --no-first-run --no-default-browser-check about:blank >/dev/null 2>&1 &
+else
+  # 标准 Chrome：用 macOS `open -na` 起独立实例（与终端解耦，最稳）
+  open -na "Google Chrome" --args \
+    --remote-debugging-port="$PORT" \
+    --user-data-dir="$PROFILE" \
+    --no-first-run --no-default-browser-check about:blank
+fi
+
+# 等 CDP 真正起来（最多 ~15s），起来了再返回，方便 agent 顺序往下走
+for _ in $(seq 1 30); do
+  if curl -s --noproxy '*' --max-time 2 "http://127.0.0.1:$PORT/json/version" | grep -q "Browser"; then
+    echo "✅ 已启动并就绪（CDP 端口 $PORT，后台运行，关终端不死）。"
+    echo "   ➜ 现在请在弹出的 Chrome 窗口里【登录一次】你要自动化的网站，登录态会长期保存。"
+    echo "   ➜ 配置完成后保持它开着。验证：CHROME_MCP_PORT=$PORT bash verify.sh"
+    exit 0
+  fi
+  sleep 0.5
+done
+echo "⚠️ Chrome 已启动，但 ${PORT} 端口 15s 内未就绪。常见原因：系统/公司代理拦了本地连接，或端口被占。"
+echo "   排查：lsof -nP -iTCP:$PORT -sTCP:LISTEN  ；换端口：CHROME_MCP_PORT=9333 $0"
+exit 0

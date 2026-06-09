@@ -6,6 +6,8 @@
 登录一次（淘宝 / 小红书 / 后台系统等），登录态长期保存，之后 AI 直接在你已登录的浏览器里干活。
 
 > 下面的安装步骤以 **Codex** 为例；Claude Code / Cursor 等任意 MCP 客户端同理（把同样的 `command`/`args` 填进它们的 MCP 配置即可）。
+>
+> 🤖 **想让 AI agent 帮你装？** 把本仓库/文件夹丢给你的 Codex / Claude / Cursor，它会读 [`AGENTS.md`](AGENTS.md) 自动完成配置。**唯一需要你本人做的是「登录一次」**——agent 不会、也不该碰你的账号密码，所以它配到登录那一步会停下来交还给你。
 
 > 本包**不依赖任何第三方平台**，核心是官方维护的 [`@playwright/mcp`](https://github.com/microsoft/playwright-mcp)。给客户即装即用。
 
