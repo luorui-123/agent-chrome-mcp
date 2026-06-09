@@ -1,0 +1,10 @@
+# 打包产物
+*.zip
+
+# 运行时 / 浏览器 profile（含登录态，绝不入库）
+.chrome-mcp-profile/
+.playwright-mcp/
+
+# 系统 / 依赖
+.DS_Store
+node_modules/

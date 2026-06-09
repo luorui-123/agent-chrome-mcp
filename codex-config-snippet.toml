@@ -1,0 +1,22 @@
+# ───────────────────────────────────────────────────────────────
+# Chrome MCP —— 把下面这段粘到客户的  ~/.codex/config.toml  末尾
+# （或用一行命令，见 README 的「方式一」）
+# ───────────────────────────────────────────────────────────────
+
+# 模式 A（推荐 / 默认）：连「专用持久 Chrome」(先跑 scripts/start-chrome.sh)
+[mcp_servers.chrome]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222", "--browser", "chrome"]
+startup_timeout_sec = 120
+
+# 防止「系统/公司代理」拦截到本地 CDP 的连接（无代理时也无害，建议保留）
+[mcp_servers.chrome.env]
+NO_PROXY = "127.0.0.1,localhost,::1"
+no_proxy = "127.0.0.1,localhost,::1"
+
+# ── 模式 B（备选）：接管「日常正在用的 Chrome」(需装 Playwright 浏览器扩展) ──
+# 二选一，不要同时启用同名 server。把上面 [mcp_servers.chrome] 那段注释掉，改用：
+# [mcp_servers.chrome]
+# command = "npx"
+# args = ["-y", "@playwright/mcp@latest", "--extension", "--browser", "chrome"]
+# startup_timeout_sec = 120
