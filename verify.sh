@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 自检：确认「Chrome 调试端口」和「@playwright/mcp」都就绪。两项都 ✅ 即可在 Codex 里使用。
+# 自检：确认「Chrome 调试端口」和「@playwright/mcp」都就绪。两项都 ✅ 即可在客户端里使用。
 PORT="${CHROME_MCP_PORT:-9222}"
+MCP_PKG="@playwright/mcp@${CHROME_MCP_VERSION:-0.0.76}"
 ok=0
 
 echo "1) 检查 Chrome 远程调试端口 $PORT ..."
@@ -10,20 +11,42 @@ if printf '%s' "$VER" | grep -q "Browser"; then
   printf '%s' "$VER" | grep -q "webSocketDebuggerUrl" && echo "   ✅ CDP WebSocket 可用（Playwright 就是连这个）"
 else
   echo "   ❌ 连不上。请先运行：bash scripts/start-chrome.sh"
+  HOLDER="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $1" (PID "$2")"}')"
+  [ -n "$HOLDER" ] && echo "   ℹ️ 端口 ${PORT} 当前被占用：${HOLDER}（不是调试版 Chrome）"
   ok=1
 fi
 
-echo "2) 检查 Node / @playwright/mcp ..."
+echo "2) 检查 Node / $MCP_PKG ...（首次运行会下载包，可能需要 1-3 分钟）"
 if command -v npx >/dev/null 2>&1; then
-  if npx -y @playwright/mcp@latest --version >/dev/null 2>&1; then
-    echo "   ✅ @playwright/mcp 可用：$(npx -y @playwright/mcp@latest --version 2>/dev/null)"
+  if npx -y "$MCP_PKG" --version >/dev/null 2>&1; then
+    echo "   ✅ $MCP_PKG 可用：$(npx -y "$MCP_PKG" --version 2>/dev/null)"
   else
-    echo "   ❌ @playwright/mcp 拉取失败，检查网络/npm 源"; ok=1
+    echo "   ❌ $MCP_PKG 拉取失败。国内网络建议先切镜像再重跑："
+    echo "      npm config set registry https://registry.npmmirror.com"
+    ok=1
   fi
 else
   echo "   ❌ 没有 npx，请先安装 Node.js (https://nodejs.org)"; ok=1
 fi
 
+echo "3) 检查 MCP 注册情况（信息项，不影响通过）..."
+FOUND=0
+if command -v codex >/dev/null 2>&1; then
+  if codex mcp list 2>/dev/null | grep -q "chrome"; then
+    echo "   ✅ Codex 已注册 chrome"
+    grep -q "startup_timeout_sec" "$HOME/.codex/config.toml" 2>/dev/null \
+      || echo "   ⚠️ ~/.codex/config.toml 的 [mcp_servers.chrome] 缺 startup_timeout_sec = 120，建议补上（防 npx 启动超时）"
+    FOUND=1
+  fi
+fi
+if command -v claude >/dev/null 2>&1; then
+  claude mcp list 2>/dev/null | grep -q "chrome" && { echo "   ✅ Claude Code 已注册 chrome"; FOUND=1; }
+fi
+if [ -f "$HOME/.cursor/mcp.json" ]; then
+  grep -q '"chrome"' "$HOME/.cursor/mcp.json" 2>/dev/null && { echo "   ✅ Cursor 已注册 chrome"; FOUND=1; }
+fi
+[ $FOUND -eq 0 ] && echo "   ℹ️ 尚未在任何已知客户端里发现 chrome，请按 README 第 2 步注册"
+
 echo ""
-[ $ok -eq 0 ] && echo "🎉 全部就绪。去 Codex 里让它：用 chrome 打开 https://example.com 并截图。" || echo "⚠️ 有未通过项，按上面提示修复后重跑：bash verify.sh"
+[ $ok -eq 0 ] && echo "🎉 全部就绪。重启客户端会话后试试：用 chrome 打开 https://example.com 并截图。" || echo "⚠️ 有未通过项，按上面提示修复后重跑：bash verify.sh"
 exit $ok

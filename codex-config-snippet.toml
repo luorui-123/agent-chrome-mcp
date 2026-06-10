@@ -1,12 +1,13 @@
 # ───────────────────────────────────────────────────────────────
 # Chrome MCP —— 把下面这段粘到客户的  ~/.codex/config.toml  末尾
-# （或用一行命令，见 README 的「方式一」）
+# （或用一行命令，见 README 的「方式一」；用一行命令后仍需补 startup_timeout_sec）
 # ───────────────────────────────────────────────────────────────
 
 # 模式 A（推荐 / 默认）：连「专用持久 Chrome」(先跑 scripts/start-chrome.sh)
 [mcp_servers.chrome]
 command = "npx"
-args = ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222", "--browser", "chrome"]
+args = ["-y", "@playwright/mcp@0.0.76", "--cdp-endpoint", "http://127.0.0.1:9222", "--browser", "chrome"]
+# Codex 默认 MCP 启动超时很短，npx 启动稍慢就会被判死——这一行必须保留
 startup_timeout_sec = 120
 
 # 防止「系统/公司代理」拦截到本地 CDP 的连接（无代理时也无害，建议保留）
@@ -18,5 +19,5 @@ no_proxy = "127.0.0.1,localhost,::1"
 # 二选一，不要同时启用同名 server。把上面 [mcp_servers.chrome] 那段注释掉，改用：
 # [mcp_servers.chrome]
 # command = "npx"
-# args = ["-y", "@playwright/mcp@latest", "--extension", "--browser", "chrome"]
+# args = ["-y", "@playwright/mcp@0.0.76", "--extension", "--browser", "chrome"]
 # startup_timeout_sec = 120
