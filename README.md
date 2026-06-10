@@ -22,6 +22,8 @@
 
 AI 会调用 `chrome` 这个 MCP 工具，在你**已登录的真实 Chrome**里执行。
 
+> 建议在指令末尾带一句安全要求：**「只读取页面可见信息，不要导出 cookie、密码、验证码或 token。」**
+
 ---
 
 ## 1. 前置要求（客户机器需要）
@@ -105,13 +107,23 @@ powershell -ExecutionPolicy Bypass -File .\verify.ps1   # Windows
 
 ### 第 4 步：重启客户端会话，试一把
 
-**新开一个会话**（MCP 配置在新会话才生效），然后说：
+**新开一个会话**（MCP 配置在新会话才生效），先说一句零副作用的：
+
+```
+用 chrome 列出当前打开的窗口和标签页
+```
+
+能列出来，再来真的：
 
 ```
 用 chrome 打开 https://example.com，截个图给我
 ```
 
-AI 应能在你那个 Chrome 窗口里打开页面并返回截图/页面结构。
+**成功标准（全部满足才算装好）：**
+- [ ] `verify` 前两项 ✅
+- [ ] 新会话里能看到 `chrome` 工具
+- [ ] 能列出 Chrome 标签页
+- [ ] 你在第 1 步窗口里登录过的网站，AI 打开后能看到登录态
 
 ---
 
@@ -123,6 +135,7 @@ AI 应能在你那个 Chrome 窗口里打开页面并返回截图/页面结构�
 | **B 接管日常 Chrome** | 你平时正在用的 Chrome（所有现成登录） | `--extension`（需装 Playwright 浏览器扩展） | 想直接用日常浏览器、不想另开窗口 |
 
 切到模式 B：见 `codex-config-snippet.toml` 里被注释的那段；并按 Playwright 提示安装其浏览器扩展。
+**模式 B 注意**：扩展必须装在你平时登录目标网站的那个 Chrome 头像（profile）里，装错头像就读不到登录态。自检：`chrome://version` 看 Profile Path 是否是你常用的那个。
 
 ---
 
@@ -134,12 +147,16 @@ AI 应能在你那个 Chrome 窗口里打开页面并返回截图/页面结构�
 - **端口被占**：换端口（`CHROME_MCP_PORT=9333`），所有步骤的端口要一致。
 - **报 "retrieving websocket url … timeout" / 连不上但 Chrome 明明开着**：多半是**系统/公司代理**把到 `127.0.0.1` 的连接也代理了。本包已默认在配置里加了 `NO_PROXY`；若仍不行，确认你客户端 MCP 配置的 `env` 里有 `NO_PROXY=127.0.0.1,localhost,::1`。
 - **Windows 报「找不到 npx / spawn npx ENOENT」**：把 MCP 配置里的 `command` 换成 `cmd`，`args` 最前面加 `"/c", "npx"`。
+- **`codex mcp add` 命令本身就报错**（如提示 vendor 二进制缺失）：这不是本包的问题，是 Codex CLI 装残了（npm 装它时 optional 依赖没下全）。根治：`npm i -g @openai/codex --force` 重装；应急：跳过命令，直接把 `codex-config-snippet.toml` 整段粘进 `~/.codex/config.toml`，效果完全等同。
+- **本包是微信/网盘传的 zip 而不是 git clone**：macOS 解压后先在包目录里跑一句 `xattr -dr com.apple.quarantine .`（清掉系统给外来文件打的隔离标记，保险动作，几秒钟）。
 - **登录态丢了**：只要还用同一个 `--user-data-dir`（默认 `~/.chrome-mcp-profile`）就不会丢。别删这个目录。
 - **抓取/自动化要遵守目标网站条款**：本包只提供能力，怎么用由使用者负责。
 
 ---
 
-## 5. 卸载
+## 5. 卸载 / 从旧版迁移
+
+卸载本包：
 
 ```bash
 codex mcp remove chrome           # Codex
@@ -147,6 +164,17 @@ claude mcp remove chrome -s user  # Claude Code
 # Cursor：删掉 ~/.cursor/mcp.json 里的 "chrome" 段
 rm -rf ~/.chrome-mcp-profile      # 如需清除登录态
 ```
+
+**从旧版迁移**：如果这台电脑以前装过「Chrome 扩展 + mcp-chrome-bridge + 12306 端口」那套老 Chrome MCP，两套并存容易让 AI 调错工具（旧的叫 `chrome-mcp-server`，本包叫 `chrome`），建议先清掉旧版再装本包：
+
+```bash
+codex mcp remove chrome-mcp-server      # 移除旧 MCP 注册（或手动删 config.toml 里对应段落）
+npm uninstall -g mcp-chrome-bridge      # 卸载旧 bridge（npm 全局装过的话）
+rm -rf ~/.codex/mcp-chrome-bridge ~/Library/Logs/mcp-chrome-bridge
+rm -f "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.chromemcp.nativehost.json"
+```
+
+最后到 `chrome://extensions/` 移除 `chrome-mcp-server` 扩展。旧版的 Native Messaging、扩展头像、12306 端口那些坑，本包架构上就不存在，迁过来就不用再管。
 
 ---
 

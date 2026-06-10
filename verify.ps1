@@ -38,7 +38,26 @@ if (Get-Command npx -ErrorAction SilentlyContinue) {
   Write-Host "   ❌ 没有 npx，请先安装 Node.js (https://nodejs.org)"; $ok = 1
 }
 
+Write-Host "3) 检查旧版残留（扩展+bridge+12306 老架构，信息项）..."
+$Old = @()
+try {
+  $req2 = [System.Net.WebRequest]::Create("http://127.0.0.1:12306/ping")
+  $req2.Proxy = $null
+  $req2.Timeout = 2000
+  $res2 = $req2.GetResponse()
+  $b2 = (New-Object System.IO.StreamReader($res2.GetResponseStream())).ReadToEnd()
+  $res2.Close()
+  if ($b2 -match 'pong') { $Old += "bridge(12306端口)" }
+} catch { }
+if (Test-Path "$env:USERPROFILE\.codex\mcp-chrome-bridge") { $Old += "目录(.codex\mcp-chrome-bridge)" }
+if ($Old.Count -gt 0) {
+  Write-Host "   ⚠️ 发现旧版 Chrome MCP 残留：$($Old -join ' ')"
+  Write-Host "      两套并存容易让 AI 调错工具，建议清理，步骤见 README「卸载 / 从旧版迁移」"
+} else {
+  Write-Host "   ✅ 无旧版残留"
+}
+
 Write-Host ""
-if ($ok -eq 0) { Write-Host "🎉 全部就绪。重启客户端会话后试试：用 chrome 打开 https://example.com 并截图。" }
+if ($ok -eq 0) { Write-Host "🎉 全部就绪。重启客户端会话后试试：用 chrome 列出当前窗口和标签页。" }
 else { Write-Host "⚠️ 有未通过项，按上面提示修复后重跑 verify.ps1" }
 exit $ok

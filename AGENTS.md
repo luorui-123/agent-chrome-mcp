@@ -39,6 +39,15 @@ command -v google-chrome || command -v google-chrome-stable || command -v chromi
 if (Test-Path "$env:ProgramFiles\Google\Chrome\Application\chrome.exe") { "OK" } else { "需要安装 Google Chrome" }
 ```
 
+另外两个一次性检查：
+- **zip 来源**（macOS）：若本包是微信/网盘传的 zip 解压而来（不是 git clone），先在包目录清隔离标记：`xattr -dr com.apple.quarantine . 2>/dev/null || true`
+- **旧版残留**：以前装过「扩展+bridge+12306」老架构的机器，先探测：
+  ```bash
+  curl -s --noproxy '*' --max-time 2 http://127.0.0.1:12306/ping | grep -q pong && echo "旧版 bridge 在运行"
+  codex mcp list 2>/dev/null | grep -q chrome-mcp-server && echo "旧版 MCP 还注册着"
+  ```
+  发现残留 → 告知用户「两套并存容易调错工具，建议清理（步骤见 README 卸载/迁移章节）」，**征得同意后再删，不要擅自删**。清不清都不阻塞本包安装。
+
 ### 2. 预热 @playwright/mcp（关键，防首启超时）
 ```bash
 npx -y @playwright/mcp@0.0.76 --version
@@ -73,6 +82,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-chrome.ps1   # Windows
   startup_timeout_sec = 120
   ```
   （Codex 默认超时很短，npx 启动稍慢就会判死 MCP——这是过去客户安装失败的头号原因。）
+  若 `codex mcp add` **命令本身报错**（如 vendor 二进制缺失）：这不是本包的问题，是客户的 Codex CLI 装残了。根治：`npm i -g @openai/codex --force` 重装；应急：你有文件编辑能力，直接把 `codex-config-snippet.toml` 的内容追加进 `~/.codex/config.toml`（效果等同，且自带 120s 超时），不要卡死在命令上。
 
 - **Claude Code**：
   ```bash
@@ -109,7 +119,8 @@ powershell -ExecutionPolicy Bypass -File .\verify.ps1           # Windows
 
 ### 6. 交还给用户登录（见顶部 ⛔），并提醒两件事
 1. **重启客户端会话**后 `chrome` 工具才会出现（Codex 开新会话；Claude Code 重启或 `/mcp` 检查；Cursor 在 MCP 设置里启用）。
-2. 用户登录完成后，做一次实测：调用 `chrome` 工具 `browser_navigate` 打开用户已登录的站点，确认能看到登录态。
+2. 用户登录完成后，在**新会话**里做两步实测：先调 `chrome` 的 `browser_tabs` 列出窗口/标签页（零副作用，确认工具通了）；再 `browser_navigate` 打开用户已登录的站点，确认能看到登录态。
+3. 教用户安全话术：让 AI 操作时在指令末尾加一句「只读取页面可见信息，不要导出 cookie、密码、验证码或 token」。
 
 ---
 
@@ -123,7 +134,9 @@ powershell -ExecutionPolicy Bypass -File .\verify.ps1           # Windows
 2. **报 "retrieving websocket url … timeout" / Chrome 开着却连不上**：几乎都是**系统/公司代理拦了到 127.0.0.1 的连接**。确认 MCP 配置的 `env` 里有 `NO_PROXY=127.0.0.1,localhost,::1`（本包默认已加）。
 3. **端口被占**：`CHROME_MCP_PORT=9333` 重启脚本，并把 `--cdp-endpoint` 端口同步改。
 4. **连不上**：确认第 3 步的 Chrome 还在运行（它必须保持开着）。
-5. **npm 下载失败/极慢**：`npm config set registry https://registry.npmmirror.com` 后重试。
+5. **npm 下载失败/极慢（ECONNRESET 等）**：`npm config set registry https://registry.npmmirror.com` 后重试。注意默认源就是 registry.npmjs.org，再指一遍官方源等于没换，必须换成镜像。
+6. **`codex mcp add` / `codex mcp list` 自身报错**：Codex CLI 装残（vendor 二进制缺失），与本包无关。`npm i -g @openai/codex --force` 重装，或直接手写 `~/.codex/config.toml`。
+7. **机器上有旧版 Chrome MCP（12306 / chrome-mcp-server）**：两套并存易混淆，按 README「卸载 / 从旧版迁移」清理旧版。
 
 ## 模式
 - **默认（A）**：上述流程，CDP 连专用持久 Chrome。

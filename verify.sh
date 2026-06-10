@@ -47,6 +47,18 @@ if [ -f "$HOME/.cursor/mcp.json" ]; then
 fi
 [ $FOUND -eq 0 ] && echo "   ℹ️ 尚未在任何已知客户端里发现 chrome，请按 README 第 2 步注册"
 
+echo "4) 检查旧版残留（扩展+bridge+12306 老架构，信息项）..."
+OLD=""
+curl -s --noproxy '*' --max-time 2 "http://127.0.0.1:12306/ping" 2>/dev/null | grep -q "pong" && OLD="${OLD}bridge(12306端口) "
+command -v codex >/dev/null 2>&1 && codex mcp list 2>/dev/null | grep -q "chrome-mcp-server" && OLD="${OLD}Codex注册(chrome-mcp-server) "
+[ -d "$HOME/.codex/mcp-chrome-bridge" ] && OLD="${OLD}目录(~/.codex/mcp-chrome-bridge) "
+if [ -n "$OLD" ]; then
+  echo "   ⚠️ 发现旧版 Chrome MCP 残留：${OLD}"
+  echo "      两套并存容易让 AI 调错工具，建议清理，步骤见 README「卸载 / 从旧版迁移」"
+else
+  echo "   ✅ 无旧版残留"
+fi
+
 echo ""
-[ $ok -eq 0 ] && echo "🎉 全部就绪。重启客户端会话后试试：用 chrome 打开 https://example.com 并截图。" || echo "⚠️ 有未通过项，按上面提示修复后重跑：bash verify.sh"
+[ $ok -eq 0 ] && echo "🎉 全部就绪。重启客户端会话后试试：用 chrome 列出当前窗口和标签页。" || echo "⚠️ 有未通过项，按上面提示修复后重跑：bash verify.sh"
 exit $ok
